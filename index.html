@@ -36,7 +36,14 @@
       $log.textContent += `\n${msg}`;
     };
 
-    let savedCredential = null;
+    // base64 工具
+    const bufferToBase64 = (buffer) => {
+      return btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    };
+
+    const base64ToBuffer = (base64) => {
+      return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    };
 
     async function registerCredential() {
       $log.textContent = '🔄 開始註冊...\n';
@@ -50,7 +57,7 @@
         },
         pubKeyCredParams: [{ type: "public-key", alg: -7 }],
         authenticatorSelection: {
-          authenticatorAttachment: "platform",  // or "cross-platform"
+          authenticatorAttachment: "platform",
           userVerification: "preferred"
         },
         timeout: 60000,
@@ -59,24 +66,30 @@
 
       try {
         const credential = await navigator.credentials.create({ publicKey });
-        savedCredential = credential;
-        log("✅ 註冊成功！\n" + JSON.stringify(credential, null, 2));
+
+        // 將 credential ID 存到 localStorage（模擬 server 存檔）
+        const rawIdBase64 = bufferToBase64(credential.rawId);
+        localStorage.setItem("webauthn_credential_id", rawIdBase64);
+
+        log("✅ 註冊成功！已儲存憑證 ID 至 localStorage。\nID: " + rawIdBase64);
       } catch (err) {
         log("❌ 註冊失敗: " + err.message);
       }
     }
 
     async function login() {
-      if (!savedCredential) {
-        log("⚠️ 請先註冊憑證");
+      $log.textContent = '🔄 開始登入驗證...\n';
+
+      const savedIdBase64 = localStorage.getItem("webauthn_credential_id");
+      if (!savedIdBase64) {
+        log("⚠️ 尚未註冊憑證，請先註冊");
         return;
       }
 
-      $log.textContent = '🔄 開始登入驗證...\n';
       const publicKey = {
         challenge: crypto.getRandomValues(new Uint8Array(32)),
         allowCredentials: [{
-          id: savedCredential.rawId,
+          id: base64ToBuffer(savedIdBase64),
           type: "public-key",
           transports: ["internal"]
         }],
