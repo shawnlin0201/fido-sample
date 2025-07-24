@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>FIDO WebAuthn 測試頁</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+    }
+    button {
+      margin: 0.5rem;
+      padding: 0.5rem 1rem;
+      font-size: 16px;
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 1rem;
+      white-space: pre-wrap;
+      max-width: 600px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔐 FIDO2 / WebAuthn 測試頁</h1>
+  <button onclick="registerCredential()">註冊憑證</button>
+  <button onclick="login()">登入驗證</button>
+
+  <h2>Log</h2>
+  <pre id="log">準備中...</pre>
+
+  <script>
+    const $log = document.getElementById('log');
+    const log = (msg) => {
+      console.log(msg);
+      $log.textContent += `\n${msg}`;
+    };
+
+    let savedCredential = null;
+
+    async function registerCredential() {
+      $log.textContent = '🔄 開始註冊...\n';
+      const publicKey = {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: "WebAuthn 測試網站" },
+        user: {
+          id: new TextEncoder().encode("user-id-123456"),
+          name: "test@example.com",
+          displayName: "測試用戶"
+        },
+        pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",  // or "cross-platform"
+          userVerification: "preferred"
+        },
+        timeout: 60000,
+        attestation: "none"
+      };
+
+      try {
+        const credential = await navigator.credentials.create({ publicKey });
+        savedCredential = credential;
+        log("✅ 註冊成功！\n" + JSON.stringify(credential, null, 2));
+      } catch (err) {
+        log("❌ 註冊失敗: " + err.message);
+      }
+    }
+
+    async function login() {
+      if (!savedCredential) {
+        log("⚠️ 請先註冊憑證");
+        return;
+      }
+
+      $log.textContent = '🔄 開始登入驗證...\n';
+      const publicKey = {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{
+          id: savedCredential.rawId,
+          type: "public-key",
+          transports: ["internal"]
+        }],
+        userVerification: "preferred",
+        timeout: 60000
+      };
+
+      try {
+        const assertion = await navigator.credentials.get({ publicKey });
+        log("✅ 登入成功！\n" + JSON.stringify(assertion, null, 2));
+      } catch (err) {
+        log("❌ 登入失敗: " + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
